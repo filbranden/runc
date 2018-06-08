@@ -55,6 +55,11 @@ type Process struct {
 	// All capabilities not specified will be dropped from the processes capability mask
 	Capabilities *configs.Capabilities
 
+	// User capabilities specify the capabilities to keep when executing a
+	// process as a non-root user inside the container.  All capabilities
+	// not specified will be dropped from the processes capability mask.
+	UserCapabilities *configs.Capabilities
+
 	// AppArmorProfile specifies the profile to apply to the process and is
 	// changed at the time the process is execed
 	AppArmorProfile string

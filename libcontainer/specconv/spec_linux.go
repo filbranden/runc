@@ -255,6 +255,15 @@ func CreateLibcontainerConfig(opts *CreateOpts) (*configs.Config, error) {
 			Ambient:     spec.Process.Capabilities.Ambient,
 		}
 	}
+	if spec.Process.UserCapabilities != nil {
+		config.UserCapabilities = &configs.Capabilities{
+			Bounding:    spec.Process.UserCapabilities.Bounding,
+			Effective:   spec.Process.UserCapabilities.Effective,
+			Permitted:   spec.Process.UserCapabilities.Permitted,
+			Inheritable: spec.Process.UserCapabilities.Inheritable,
+			Ambient:     spec.Process.UserCapabilities.Ambient,
+		}
+	}
 	createHooks(spec, config)
 	config.Version = specs.Version
 	if spec.Linux.IntelRdt != nil {

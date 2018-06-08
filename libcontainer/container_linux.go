@@ -541,6 +541,7 @@ func (c *linuxContainer) newInitConfig(process *Process) *initConfig {
 		AdditionalGroups: process.AdditionalGroups,
 		Cwd:              process.Cwd,
 		Capabilities:     process.Capabilities,
+		UserCapabilities: process.UserCapabilities,
 		PassedFilesCount: len(process.ExtraFiles),
 		ContainerId:      c.ID(),
 		NoNewPrivileges:  c.config.NoNewPrivileges,

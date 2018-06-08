@@ -131,6 +131,14 @@ func newProcess(p specs.Process, init bool) (*libcontainer.Process, error) {
 		lp.Capabilities.Permitted = p.Capabilities.Permitted
 		lp.Capabilities.Ambient = p.Capabilities.Ambient
 	}
+	if p.UserCapabilities != nil {
+		lp.UserCapabilities = &configs.Capabilities{}
+		lp.UserCapabilities.Bounding = p.UserCapabilities.Bounding
+		lp.UserCapabilities.Effective = p.UserCapabilities.Effective
+		lp.UserCapabilities.Inheritable = p.UserCapabilities.Inheritable
+		lp.UserCapabilities.Permitted = p.UserCapabilities.Permitted
+		lp.UserCapabilities.Ambient = p.UserCapabilities.Ambient
+	}
 	for _, gid := range p.User.AdditionalGids {
 		lp.AdditionalGroups = append(lp.AdditionalGroups, strconv.FormatUint(uint64(gid), 10))
 	}

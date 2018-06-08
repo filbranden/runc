@@ -187,6 +187,15 @@ func getProcess(context *cli.Context, bundle string) (*specs.Process, error) {
 			p.Capabilities.Ambient = append(p.Capabilities.Ambient, c)
 		}
 	}
+	if usercaps := context.StringSlice("user-cap"); len(usercaps) > 0 {
+		for _, c := range usercaps {
+			p.UserCapabilities.Bounding = append(p.UserCapabilities.Bounding, c)
+			p.UserCapabilities.Inheritable = append(p.UserCapabilities.Inheritable, c)
+			p.UserCapabilities.Effective = append(p.UserCapabilities.Effective, c)
+			p.UserCapabilities.Permitted = append(p.UserCapabilities.Permitted, c)
+			p.UserCapabilities.Ambient = append(p.UserCapabilities.Ambient, c)
+		}
+	}
 	// append the passed env variables
 	p.Env = append(p.Env, context.StringSlice("env")...)
 

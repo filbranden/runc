@@ -117,6 +117,11 @@ type Config struct {
 	// All capabilities not specified will be dropped from the processes capability mask
 	Capabilities *Capabilities `json:"capabilities"`
 
+	// User capabilities specify the capabilities to keep when executing a
+	// process as a non-root user inside the container.  All capabilities
+	// not specified will be dropped from the processes capability mask.
+	UserCapabilities *Capabilities `json:"user_capabilities"`
+
 	// Networks specifies the container's network setup to be created
 	Networks []*Network `json:"networks"`
 

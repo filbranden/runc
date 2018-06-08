@@ -44,6 +44,8 @@ type Process struct {
 	Cwd string `json:"cwd"`
 	// Capabilities are Linux capabilities that are kept for the process.
 	Capabilities *LinuxCapabilities `json:"capabilities,omitempty" platform:"linux"`
+	// UserCapabilities are Linux capabilities that are kept for the process when running as non-root.
+	UserCapabilities *LinuxCapabilities `json:"userCapabilities,omitempty" platform:"linux"`
 	// Rlimits specifies rlimit options to apply to the process.
 	Rlimits []POSIXRlimit `json:"rlimits,omitempty" platform:"linux,solaris"`
 	// NoNewPrivileges controls whether additional privileges could be gained by processes in the container.

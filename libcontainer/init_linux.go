@@ -52,6 +52,7 @@ type initConfig struct {
 	Env              []string              `json:"env"`
 	Cwd              string                `json:"cwd"`
 	Capabilities     *configs.Capabilities `json:"capabilities"`
+	UserCapabilities *configs.Capabilities `json:"user_capabilities"`
 	ProcessLabel     string                `json:"process_label"`
 	AppArmorProfile  string                `json:"apparmor_profile"`
 	NoNewPrivileges  bool                  `json:"no_new_privileges"`
@@ -148,6 +149,19 @@ func finalizeNamespace(config *initConfig) error {
 	}
 	if err := system.ClearKeepCaps(); err != nil {
 		return errors.Wrap(err, "clear keep caps")
+	}
+	// decide to use capabilities or userCapabilities depending on whether the EUID is != 0.
+	if os.Geteuid() != 0 {
+		capabilities = &configs.Capabilities{}
+		if config.UserCapabilities != nil {
+			capabilities = config.UserCapabilities
+		} else if config.Config.UserCapabilities != nil {
+			capabilities = config.Config.UserCapabilities
+		}
+		w, err = newContainerCapList(capabilities)
+		if err != nil {
+			return err
+		}
 	}
 	if err := w.ApplyCaps(); err != nil {
 		return errors.Wrap(err, "apply caps")
