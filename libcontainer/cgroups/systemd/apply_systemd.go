@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	systemdDbus "github.com/coreos/go-systemd/dbus"
@@ -20,12 +21,16 @@ import (
 	"github.com/opencontainers/runc/libcontainer/cgroups/fs"
 	"github.com/opencontainers/runc/libcontainer/configs"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/sys/unix"
 )
 
+type CgroupSetup int
+
 type Manager struct {
-	mu      sync.Mutex
-	Cgroups *configs.Cgroup
-	Paths   map[string]string
+	mu          sync.Mutex
+	Cgroups     *configs.Cgroup
+	Paths       map[string]string
+	CgroupSetup CgroupSetup
 }
 
 type subsystem interface {
@@ -67,8 +72,23 @@ var subsystems = subsystemSet{
 }
 
 const (
+	// cgroupv2 only, mounted directly under cgroupRoot.
+	CGROUP_SETUP_UNIFIED CgroupSetup = 1
+
+	// cgroupv1 only, tmpfs under cgroupRoot and subdirectories for controllers.
+	CGROUP_SETUP_LEGACY CgroupSetup = 2
+
+	// cgroupv1+cgroupv2, v2 mounted under "unified" alongside v1 controllers.
+	CGROUP_SETUP_HYBRID CgroupSetup = 3
+
+	// Unknown, error trying to determine cgroup setup.
+	CGROUP_SETUP_UNKNOWN CgroupSetup = 0
+)
+
+const (
 	testScopeWait = 4
 	testSliceWait = 4
+	cgroupRoot    = "/sys/fs/cgroup"
 )
 
 var (
@@ -80,6 +100,40 @@ var (
 	hasDelegateScope                bool
 	hasDelegateSlice                bool
 )
+
+// Detect CgroupSetup of /sys/fs/cgroup.
+// According to https://systemd.io/CGROUP_DELEGATION.html#three-different-tree-setups-
+func detectCgroupSetup() (CgroupSetup, error) {
+	var statfs unix.Statfs_t
+
+	if err := unix.Statfs(cgroupRoot, &statfs); err != nil {
+		return CGROUP_SETUP_UNKNOWN, err
+	}
+
+	if statfs.Type == unix.CGROUP2_SUPER_MAGIC {
+		// Found cgroupv2 mounted directly under /sys/fs/cgroup, so it's unified.
+		return CGROUP_SETUP_UNIFIED, nil
+	}
+
+	if statfs.Type != unix.TMPFS_MAGIC {
+		return CGROUP_SETUP_UNKNOWN, fmt.Errorf("expecting statfs type of %s to be either cgroup2 or tmpfs, found %lx instead", cgroupRoot, statfs.Type)
+	}
+
+	err := unix.Statfs(filepath.Join(cgroupRoot, "unified"), &statfs)
+	if err == syscall.ENOENT {
+		// The root is a tmpfs and "unified" subdirectory does not exist, so it's legacy.
+		return CGROUP_SETUP_LEGACY, nil
+	} else if err != nil {
+		return CGROUP_SETUP_UNKNOWN, err
+	}
+
+	if statfs.Type != unix.CGROUP2_SUPER_MAGIC {
+		return CGROUP_SETUP_UNKNOWN, fmt.Errorf("expecting statfs type of %s to be cgroup2, found %lx instead", filepath.Join(cgroupRoot, "unified"), statfs.Type)
+	}
+
+	// Found a tmpfs at the root and a "unified" subdirectory with cgroupv2 mounted on it, so it's hybrid.
+	return CGROUP_SETUP_HYBRID, nil
+}
 
 func newProp(name string, units interface{}) systemdDbus.Property {
 	return systemdDbus.Property{
@@ -217,10 +271,15 @@ func NewSystemdCgroupsManager() (func(config *configs.Cgroup, paths map[string]s
 	if !systemdUtil.IsRunningSystemd() {
 		return nil, fmt.Errorf("systemd not running on this host, can't use systemd as a cgroups.Manager")
 	}
+	cgroupSetup, err := detectCgroupSetup()
+	if err != nil {
+		return nil, err
+	}
 	return func(config *configs.Cgroup, paths map[string]string) cgroups.Manager {
 		return &Manager{
-			Cgroups: config,
-			Paths:   paths,
+			Cgroups:     config,
+			Paths:       paths,
+			CgroupSetup: cgroupSetup,
 		}
 	}, nil
 }
