@@ -24,10 +24,13 @@ import (
 	"golang.org/x/sys/unix"
 )
 
+type CgroupSetup int
+
 type Manager struct {
-	mu      sync.Mutex
-	Cgroups *configs.Cgroup
-	Paths   map[string]string
+	mu          sync.Mutex
+	Cgroups     *configs.Cgroup
+	Paths       map[string]string
+	CgroupSetup CgroupSetup
 }
 
 type subsystem interface {
@@ -68,8 +71,6 @@ var subsystems = subsystemSet{
 	&fs.NameGroup{GroupName: "name=systemd"},
 }
 
-type CgroupSetup int
-
 const (
 	// cgroupv2 only, mounted directly under cgroupRoot.
 	CGROUP_SETUP_UNIFIED CgroupSetup = 1
@@ -98,11 +99,20 @@ var (
 	hasTransientDefaultDependencies bool
 	hasDelegateScope                bool
 	hasDelegateSlice                bool
+	cacheCgroupSetup                CgroupSetup
 )
 
 // Detect CgroupSetup of /sys/fs/cgroup.
 // According to https://systemd.io/CGROUP_DELEGATION.html#three-different-tree-setups-
 func DetectCgroupSetup() (CgroupSetup, error) {
+	if cacheCgroupSetup != CGROUP_SETUP_UNKNOWN {
+		return cacheCgroupSetup, nil
+	}
+	cacheCgroupSetup, err := doDetectCgroupSetup()
+	return cacheCgroupSetup, err
+}
+
+func doDetectCgroupSetup() (CgroupSetup, error) {
 	var statfs unix.Statfs_t
 
 	if err := unix.Statfs(cgroupRoot, &statfs); err != nil {

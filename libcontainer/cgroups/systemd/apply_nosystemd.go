@@ -10,12 +10,17 @@ import (
 )
 
 type Manager struct {
-	Cgroups *configs.Cgroup
-	Paths   map[string]string
+	Cgroups     *configs.Cgroup
+	Paths       map[string]string
+	CgroupSetup int
 }
 
 func UseSystemd() bool {
 	return false
+}
+
+func DetectCgroupSetup() (int, error) {
+	return 0, nil
 }
 
 func (m *Manager) Apply(pid int) error {
