@@ -643,6 +643,15 @@ func (m *Manager) Set(container *configs.Config) error {
 		return nil
 	}
 	for _, sys := range subsystems {
+		if m.CgroupSetup == CGROUP_SETUP_UNIFIED {
+			name := sys.Name()
+			switch name {
+			case "devices":
+				logrus.Warnf("Skipping devices unit on unified cgroup")
+				continue
+			}
+		}
+
 		// Get the subsystem path, but don't error out for not found cgroups.
 		path, err := m.getSubsystemPath(container.Cgroups, sys.Name())
 		if err != nil && !cgroups.IsNotFound(err) {
