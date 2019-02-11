@@ -472,6 +472,10 @@ func (m *Manager) join(c *configs.Cgroup, subsystem string, pid int) (string, er
 }
 
 func (m *Manager) joinCgroups(c *configs.Cgroup, pid int) error {
+	if m.CgroupSetup == CGROUP_SETUP_UNIFIED {
+		return nil
+	}
+
 	for _, sys := range subsystems {
 		name := sys.Name()
 		switch name {
