@@ -295,7 +295,7 @@ func (m *Manager) Apply(pid int) error {
 	if c.Paths != nil {
 		paths := make(map[string]string)
 		for name, path := range c.Paths {
-			_, err := getSubsystemPath(m.Cgroups, name)
+			_, err := m.getSubsystemPath(m.Cgroups, name)
 			if err != nil {
 				// Don't fail if a cgroup hierarchy was not found, just skip this subsystem
 				if cgroups.IsNotFound(err) {
@@ -400,7 +400,7 @@ func (m *Manager) Apply(pid int) error {
 	// We have to set kernel memory here, as we can't change it once
 	// processes have been attached to the cgroup.
 	if c.Resources.KernelMemory != 0 {
-		if err := setKernelMemory(c); err != nil {
+		if err := m.setKernelMemory(c); err != nil {
 			return err
 		}
 	}
@@ -416,13 +416,13 @@ func (m *Manager) Apply(pid int) error {
 		return err
 	}
 
-	if err := joinCgroups(c, pid); err != nil {
+	if err := m.joinCgroups(c, pid); err != nil {
 		return err
 	}
 
 	paths := make(map[string]string)
 	for _, s := range subsystems {
-		subsystemPath, err := getSubsystemPath(m.Cgroups, s.Name())
+		subsystemPath, err := m.getSubsystemPath(m.Cgroups, s.Name())
 		if err != nil {
 			// Don't fail if a cgroup hierarchy was not found, just skip this subsystem
 			if cgroups.IsNotFound(err) {
@@ -457,8 +457,8 @@ func (m *Manager) GetPaths() map[string]string {
 	return paths
 }
 
-func join(c *configs.Cgroup, subsystem string, pid int) (string, error) {
-	path, err := getSubsystemPath(c, subsystem)
+func (m *Manager) join(c *configs.Cgroup, subsystem string, pid int) (string, error) {
+	path, err := m.getSubsystemPath(c, subsystem)
 	if err != nil {
 		return "", err
 	}
@@ -471,14 +471,14 @@ func join(c *configs.Cgroup, subsystem string, pid int) (string, error) {
 	return path, nil
 }
 
-func joinCgroups(c *configs.Cgroup, pid int) error {
+func (m *Manager) joinCgroups(c *configs.Cgroup, pid int) error {
 	for _, sys := range subsystems {
 		name := sys.Name()
 		switch name {
 		case "name=systemd":
 			// let systemd handle this
 		case "cpuset":
-			path, err := getSubsystemPath(c, name)
+			path, err := m.getSubsystemPath(c, name)
 			if err != nil && !cgroups.IsNotFound(err) {
 				return err
 			}
@@ -487,7 +487,7 @@ func joinCgroups(c *configs.Cgroup, pid int) error {
 				return err
 			}
 		default:
-			_, err := join(c, name, pid)
+			_, err := m.join(c, name, pid)
 			if err != nil {
 				// Even if it's `not found` error, we'll return err
 				// because devices cgroup is hard requirement for
@@ -541,7 +541,7 @@ func ExpandSlice(slice string) (string, error) {
 	return path, nil
 }
 
-func getSubsystemPath(c *configs.Cgroup, subsystem string) (string, error) {
+func (m *Manager) getSubsystemPath(c *configs.Cgroup, subsystem string) (string, error) {
 	mountpoint, err := cgroups.FindCgroupMountpoint(c.Path, subsystem)
 	if err != nil {
 		return "", err
@@ -568,7 +568,7 @@ func getSubsystemPath(c *configs.Cgroup, subsystem string) (string, error) {
 }
 
 func (m *Manager) Freeze(state configs.FreezerState) error {
-	path, err := getSubsystemPath(m.Cgroups, "freezer")
+	path, err := m.getSubsystemPath(m.Cgroups, "freezer")
 	if err != nil {
 		return err
 	}
@@ -587,7 +587,7 @@ func (m *Manager) Freeze(state configs.FreezerState) error {
 }
 
 func (m *Manager) GetPids() ([]int, error) {
-	path, err := getSubsystemPath(m.Cgroups, "devices")
+	path, err := m.getSubsystemPath(m.Cgroups, "devices")
 	if err != nil {
 		return nil, err
 	}
@@ -595,7 +595,7 @@ func (m *Manager) GetPids() ([]int, error) {
 }
 
 func (m *Manager) GetAllPids() ([]int, error) {
-	path, err := getSubsystemPath(m.Cgroups, "devices")
+	path, err := m.getSubsystemPath(m.Cgroups, "devices")
 	if err != nil {
 		return nil, err
 	}
@@ -627,7 +627,7 @@ func (m *Manager) Set(container *configs.Config) error {
 	}
 	for _, sys := range subsystems {
 		// Get the subsystem path, but don't error out for not found cgroups.
-		path, err := getSubsystemPath(container.Cgroups, sys.Name())
+		path, err := m.getSubsystemPath(container.Cgroups, sys.Name())
 		if err != nil && !cgroups.IsNotFound(err) {
 			return err
 		}
@@ -653,8 +653,8 @@ func getUnitName(c *configs.Cgroup) string {
 	return c.Name
 }
 
-func setKernelMemory(c *configs.Cgroup) error {
-	path, err := getSubsystemPath(c, "memory")
+func (m *Manager) setKernelMemory(c *configs.Cgroup) error {
+	path, err := m.getSubsystemPath(c, "memory")
 	if err != nil && !cgroups.IsNotFound(err) {
 		return err
 	}
