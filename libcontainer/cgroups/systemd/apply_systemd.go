@@ -542,9 +542,22 @@ func ExpandSlice(slice string) (string, error) {
 }
 
 func (m *Manager) getSubsystemPath(c *configs.Cgroup, subsystem string) (string, error) {
-	mountpoint, err := cgroups.FindCgroupMountpoint(c.Path, subsystem)
-	if err != nil {
-		return "", err
+	var mountpoint string
+	if m.CgroupSetup == CGROUP_SETUP_UNIFIED {
+		// When using unified setup (cgroupv2 only mounted directly
+		// under /sys/fs/cgroup), then consider that root to always be
+		// the mountpoint. Furthermore, /proc/$PID/cgroup displays that
+		// entry with an empty subsystem, so reset it to the empty
+		// string here to make getControllerPath work correctly with
+		// it.
+		mountpoint = cgroupRoot
+		subsystem = ""
+	} else {
+		var err error
+		mountpoint, err = cgroups.FindCgroupMountpoint(c.Path, subsystem)
+		if err != nil {
+			return "", err
+		}
 	}
 
 	initPath, err := cgroups.GetInitCgroup(subsystem)
